@@ -10,6 +10,12 @@ A simple weight tracking application with a web-based interface that allows user
 - Weight over time is displayed in a chart.
 - Data is persisted in a JSON file (`weights.json`).
 
+## Demo
+
+See below screenshot for example
+
+<img src="assets/demo.png" alt="demo" width="435" height="435" />
+
 ## Technologies Used
 - **Backend:** Go (net/http)
 - **Frontend:** HTML, JavaScript, Chart.js
