@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KiloKeeper</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+
+        h1,
+        h2 {
+            color: #4a90e2;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .container {
+            width: 80%;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-container {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        canvas {
+            max-width: 100%;
+        }
+
+        .form-container {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #fafafa;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-container label {
+            font-weight: bold;
+            display: block;
+            margin: 10px 0 5px;
+        }
+
+        .form-container input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+
+        .form-container button {
+            background-color: #4a90e2;
+            color: #fff;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+
+        .form-container button:hover {
+            background-color: #357ab7;
+        }
+
+        .alert {
+            text-align: center;
+            font-size: 16px;
+            color: #fff;
+            background-color: #4caf50;
+            padding: 10px;
+            margin-top: 20px;
+            border-radius: 4px;
+        }
+
+        .alert.error {
+            background-color: #f44336;
+        }
+
+        .alert.success {
+            background-color: #4caf50;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>KiloKeeper</h1>
+        <p style="text-align: center; color: #666; font-size: 18px; margin-top: -10px;">
+            Keep track of your weight, one kilo at a time
+        </p>
+
+        <div class="chart-container">
+            <canvas id="weightChart" width="400" height="200"></canvas>
+        </div>
+
+        <div id="alertMessage" class="alert" style="display: none;"></div>
+
+        <div class="form-container">
+            <h2>Log New Weight</h2>
+            <form id="weightForm">
+                <label for="date">Date:</label>
+                <input type="date" id="date" required>
+                <br>
+                <label for="weight">Weight (kg):</label>
+                <input type="number" id="weight" step="0.1" required>
+                <br>
+                <button type="submit">Add Weight</button>
+            </form>
+        </div>
+
+    </div>
+
+    <script>
+        function fetchWeights() {
+            fetch('/weights')
+                .then(response => response.json())
+                .then(data => {
+                    data.sort((a, b) => {
+                        const dateA = new Date(convertToDate(a.date));
+                        const dateB = new Date(convertToDate(b.date));
+                        return dateA - dateB;
+                    });
+
+                    const labels = data.map(entry => entry.date);
+                    const weights = data.map(entry => entry.kilograms);
+
+                    const ctx = document.getElementById('weightChart').getContext('2d');
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Weight (kg)',
+                                data: weights,
+                                borderColor: 'blue',
+                                borderWidth: 2,
+                                fill: true,
+                                pointRadius: 1,
+                                pointBackgroundColor: 'red'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            scales: {
+                                x: { title: { display: true, text: 'Date' } },
+                                y: { title: { display: true, text: 'Weight (kg)' }, beginAtZero: false }
+                            }
+                        }
+                    });
+                });
+        }
+
+        // Convert DD/MM/YYYY to Date object for sorting
+        function convertToDate(dateString) {
+            const [day, month, year] = dateString.split('/');
+            return new Date(year, month - 1, day); // JavaScript months are 0-indexed
+        }
+
+        // Convert YYYY-MM-DD to DD/MM/YYYY
+        function convertDateFormat(dateString) {
+            const date = new Date(dateString);
+            const day = ("0" + date.getDate()).slice(-2);
+            const month = ("0" + (date.getMonth() + 1)).slice(-2);
+            const year = date.getFullYear();
+            return `${day}/${month}/${year}`;
+        }
+
+        document.getElementById('weightForm').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            const date = document.getElementById('date').value;
+            const weight = parseFloat(document.getElementById('weight').value);
+
+            const formattedDate = convertDateFormat(date);
+            const newWeight = { date: formattedDate, kilograms: weight };
+
+            fetch('/weights/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newWeight)
+            })
+                .then(response => {
+                    const alertMessage = document.getElementById('alertMessage');
+                    if (response.status === 201) {
+                        alertMessage.textContent = 'New weight added successfully! (refresh the page to see the updated chart)';
+                        alertMessage.className = 'alert success';
+                        alertMessage.style.display = 'block';
+                    } else {
+                        alertMessage.textContent = 'Failed to add weight. Please try again.';
+                        alertMessage.className = 'alert error';
+                        alertMessage.style.display = 'block';
+                    }
+                })
+                .catch(error => {
+                    const alertMessage = document.getElementById('alertMessage');
+                    alertMessage.textContent = 'Error: ' + error;
+                    alertMessage.className = 'alert error';
+                    alertMessage.style.display = 'block';
+                });
+        });
+
+        fetchWeights();
+    </script>
+
+</body>
+
+</html>
