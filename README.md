@@ -1,4 +1,4 @@
-<img src="assets/logo.png" alt="logo" width="500" height="250" />
+<img src="web/assets/logo.png" alt="logo" width="500" height="250" />
 
 # KiloKeeper
 
