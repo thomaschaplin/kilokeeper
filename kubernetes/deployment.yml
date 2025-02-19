@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kilokeeper
+  labels:
+    app: kilokeeper
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kilokeeper
+  template:
+    metadata:
+      labels:
+        app: kilokeeper
+    spec:
+      containers:
+        - name: kilokeeper
+          image: zeemarsh/kilokeeper:latest
+          ports:
+            - containerPort: 8080

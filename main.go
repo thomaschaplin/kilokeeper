@@ -67,7 +67,13 @@ func main() {
 	http.HandleFunc("/weights/add", addWeightHandler)
 
 	fmt.Println("Server running on http://localhost:8080")
-	http.Handle("/", http.FileServer(http.Dir("./web")))
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./web/index.html")
+	})
+
+	fileServer := http.FileServer(http.Dir("./web/assets"))
+	http.Handle("/assets/", http.StripPrefix("/assets/", fileServer))
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
