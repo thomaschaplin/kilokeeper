@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kilokeeper
+  labels:
+    app: kilokeeper
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kilokeeper
+  template:
+    metadata:
+      labels:
+        app: kilokeeper
+    spec:
+      containers:
+        - name: kilokeeper
+          image: zeemarsh/kilokeeper:latest
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - mountPath: /data
+              name: kilokeeper-storage
+      volumes:
+        - name: kilokeeper-storage
+          persistentVolumeClaim:
+            claimName: kilokeeper-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kilokeeper-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
