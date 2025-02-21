@@ -14,7 +14,7 @@ A simple weight tracking application with a web-based interface that allows user
 
 See below screenshot for example
 
-<img src="assets/demo.png" alt="demo" width="435" height="435" />
+<img src="web/assets/demo.png" alt="demo" width="435" height="435" />
 
 ## Technologies Used
 - **Backend:** Go (net/http)

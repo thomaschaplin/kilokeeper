@@ -19,3 +19,21 @@ spec:
           image: zeemarsh/kilokeeper:latest
           ports:
             - containerPort: 8080
+          volumeMounts:
+            - mountPath: /data
+              name: kilokeeper-storage
+      volumes:
+        - name: kilokeeper-storage
+          persistentVolumeClaim:
+            claimName: kilokeeper-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kilokeeper-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
