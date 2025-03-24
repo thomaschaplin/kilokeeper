@@ -148,7 +148,12 @@
                     });
 
                     const labels = data.map(entry => entry.date);
-                    const weights = data.map(entry => entry.kilograms);
+                    const weightsKilograms = data.map(entry => entry.kilograms);
+                    const weightsStones = data.map(entry => entry.stones);
+                    const age = data.map(entry => entry.age);
+                    const bmi = data.map(entry => entry.bmi);
+                    const bmiStatus = data.map(entry => entry.bmiStatus);
+                    const goalWeight = data.map(entry => entry.goal);
 
                     const ctx = document.getElementById('weightChart').getContext('2d');
                     new Chart(ctx, {
@@ -157,16 +162,41 @@
                             labels: labels,
                             datasets: [{
                                 label: 'Weight (kg)',
-                                data: weights,
+                                data: weightsKilograms,
                                 borderColor: 'blue',
                                 borderWidth: 2,
                                 fill: true,
                                 pointRadius: 1,
-                                pointBackgroundColor: 'red'
+                                pointBackgroundColor: 'blue'
+                            },
+                            {
+                                label: 'Goal Weight',
+                                data: goalWeight,
+                                borderColor: 'green',
+                                borderWidth: 1,
+                                fill: false,
+                                pointRadius: 0,
+                                pointBackgroundColor: 'green',
+                                borderDash: [5, 5], // Makes it a dashed line
                             }]
                         },
                         options: {
                             responsive: true,
+                            plugins: {
+                                tooltip: {
+                                    callbacks: {
+                                        label: function (tooltipItem) {
+                                            const index = tooltipItem.dataIndex;
+                                            const kg = weightsKilograms[index];
+                                            const stoneLabel = weightsStones[index];
+                                            const ageLabel = age[index];
+                                            const bmiLabel = bmi[index];
+                                            const bmiStatusLabel = bmiStatus[index];
+                                            return `${kg}kg | ${stoneLabel} | ${ageLabel} years old | BMI ${bmiLabel} (${bmiStatusLabel})`;
+                                        }
+                                    }
+                                }
+                            },
                             scales: {
                                 x: { title: { display: true, text: 'Date' } },
                                 y: { title: { display: true, text: 'Weight (kg)' }, beginAtZero: false }
