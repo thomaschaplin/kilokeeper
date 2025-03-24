@@ -23,6 +23,7 @@ type WeightResponse struct {
 	Age       int     `json:"age"`
 	Bmi       string  `json:"bmi"`
 	BmiStatus string  `json:"bmiStatus"`
+	Goal      string  `json:"goal"`
 }
 
 var weights []WeightEntry
@@ -117,6 +118,12 @@ func getWeightsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	goal := os.Getenv("GOAL")
+	if height == "" {
+		http.Error(w, "Goal weight (GOAL) environment variable not set", http.StatusInternalServerError)
+		return
+	}
+
 	var response []WeightResponse
 	for _, entry := range weights {
 
@@ -139,6 +146,7 @@ func getWeightsHandler(w http.ResponseWriter, r *http.Request) {
 			Age:       age,
 			Bmi:       fmt.Sprintf("%.1f", calculateBMI(entry.Kilograms, heightFloat)),
 			BmiStatus: calculateBmiStatus(calculateBMI(entry.Kilograms, heightFloat)),
+			Goal:      goal,
 		})
 	}
 	json.NewEncoder(w).Encode(response)

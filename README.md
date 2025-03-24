@@ -9,6 +9,10 @@ A simple weight tracking application with a web-based interface that allows user
 - View a historical graph of weight changes over time.
 - Weight over time is displayed in a chart.
 - Data is persisted in a JSON file (`weights.json`).
+- Calculate and display BMI and BMI status.
+- Display age based on date of birth.
+- Display weight in kilograms and stones, pounds, and ounces.
+- Display goal weight.
 
 ## Demo
 
@@ -27,6 +31,11 @@ See below screenshot for example
 - Go installed (1.16+ recommended)
 - A working web browser
 
+### Environment Variables
+- `DOB`: Date of birth in `DD/MM/YYYY` format.
+- `HEIGHT`: Height in meters. e.g. `1.75`
+- `GOAL`: Goal weight in kilograms. e.g. `70.2`
+
 ### Steps to Run
 1. **Clone the repository:**
    ```sh
@@ -42,11 +51,17 @@ See below screenshot for example
    ```json
    []
    ```
-4. **Run the application:**
+4. **Set environment variables:**
+   ```sh
+   export DOB="01/01/1990"
+   export HEIGHT="1.75"
+   export GOAL="70.2"
+   ```
+5. **Run the application:**
    ```sh
    go run main.go
    ```
-5. **Access the web app:**
+6. **Access the web app:**
    Open `http://localhost:8080` in your browser.
 
 ## API Endpoints
@@ -66,10 +81,11 @@ See below screenshot for example
 ```
 
 ## Future Improvements
+- [X] Add BMI calculation.
+- [X] Add age to chart based on global date of birth
 - [ ] Store data in a database instead of JSON files.
-- [ ] Implement user authentication.
-- [ ] Add BMI calculation.
-- [ ] Add age to chart based on global date of birth
+- [ ] Add multiple users.
+- [ ] Add user authentication.
 
 ## License
 MIT License
