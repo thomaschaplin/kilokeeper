@@ -19,6 +19,13 @@ spec:
           image: thomaschaplin/kilokeeper:latest
           ports:
             - containerPort: 8080
+          env:
+            - name: HEIGHT
+              value: "1.75"
+            - name: GOAL
+              value: "70.2"
+            - name: DOB
+              value: "31/12/1990"
           volumeMounts:
             - mountPath: /data
               name: kilokeeper-storage
