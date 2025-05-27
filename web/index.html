@@ -104,63 +104,128 @@
         .alert.success {
             background-color: #4caf50;
         }
+
+        #weightSummary {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 18px;
+            color: #333;
+        }
     </style>
 </head>
 
 <body>
 
-    <div class="container">
-        <img class="logo" src="assets/logo.png" alt="KiloKeeper">
-        <p style="text-align: center; color: #666; font-size: 18px; margin-top: -10px;">
-            Keep track of your weight, one kilo at a time
-        </p>
+<div class="container">
+    <img class="logo" src="assets/logo.png" alt="KiloKeeper">
+    <p style="text-align: center; color: #666; font-size: 18px; margin-top: -10px;">
+        <strong>Keep track of your weight, one kilo at a time</strong>
+    </p>
 
-        <div class="chart-container">
-            <canvas id="weightChart" width="400" height="200"></canvas>
-        </div>
-
-        <div id="alertMessage" class="alert" style="display: none;"></div>
-
-        <div class="form-container">
-            <h2>Log New Weight</h2>
-            <form id="weightForm">
-                <label for="date">Date:</label>
-                <input type="date" id="date" required>
-                <br>
-                <label for="weight">Weight (kg):</label>
-                <input type="number" id="weight" step="0.1" required>
-                <br>
-                <button type="submit">Add Weight</button>
-            </form>
-        </div>
-
+    <div style="text-align: center; margin-bottom: 20px;">
+        <label for="rangeInput">View the last</label>
+        <input type="number" id="rangeInput" min="1" placeholder="e.g. 30" style="width: 80px; padding: 5px;">
+        <span>days</span>
+        <button id="applyRange" style="margin-left: 10px; padding: 6px 12px;">Apply</button>
     </div>
 
-    <script>
-        function fetchWeights() {
-            fetch('/weights')
-                .then(response => response.json())
-                .then(data => {
-                    data.sort((a, b) => {
-                        const dateA = new Date(convertToDate(a.date));
-                        const dateB = new Date(convertToDate(b.date));
-                        return dateA - dateB;
-                    });
+    <div id="weightSummary"></div>
 
-                    const labels = data.map(entry => entry.date);
-                    const weightsKilograms = data.map(entry => entry.kilograms);
-                    const weightsStones = data.map(entry => entry.stones);
-                    const age = data.map(entry => entry.age);
-                    const bmi = data.map(entry => entry.bmi);
-                    const bmiStatus = data.map(entry => entry.bmiStatus);
-                    const goalWeight = data.map(entry => entry.goal);
+    <div class="chart-container">
+        <canvas id="weightChart" width="400" height="200"></canvas>
+    </div>
 
-                    const ctx = document.getElementById('weightChart').getContext('2d');
-                    new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: labels,
-                            datasets: [{
+    <div id="alertMessage" class="alert" style="display: none;"></div>
+
+    <div class="form-container">
+        <h2>Log New Weight</h2>
+        <form id="weightForm">
+            <label for="date">Date:</label>
+            <input type="date" id="date" required>
+            <br>
+            <label for="weight">Weight (kg):</label>
+            <input type="number" id="weight" step="0.1" required>
+            <br>
+            <button type="submit">Add Weight</button>
+        </form>
+    </div>
+
+</div>
+
+<script>
+    let chartInstance = null;
+
+    function fetchWeights(filterDays = null) {
+        fetch('/weights')
+            .then(response => response.json())
+            .then(data => {
+                data.sort((a, b) => {
+                    const dateA = new Date(convertToDate(a.date));
+                    const dateB = new Date(convertToDate(b.date));
+                    return dateA - dateB;
+                });
+
+                if (filterDays && !isNaN(filterDays)) {
+                    const cutoff = new Date();
+                    cutoff.setDate(cutoff.getDate() - parseInt(filterDays));
+                    data = data.filter(entry => new Date(convertToDate(entry.date)) >= cutoff);
+                }
+
+                // Summary section: Calculate drop and percentage
+                if (data.length >= 2) {
+                const startWeight = data[0].kilograms;
+                const endWeight = data[data.length - 1].kilograms;
+
+                const dropKg = (startWeight - endWeight).toFixed(1);
+                const percentChange = ((dropKg / startWeight) * 100).toFixed(1);
+
+                const direction = dropKg >= 0 ? 'Loss' : 'Gain';
+
+                // Find min and max entries
+                let minEntry = data[0];
+                let maxEntry = data[0];
+
+                for (let entry of data) {
+                    if (entry.kilograms < minEntry.kilograms) {
+                        minEntry = entry;
+                    }
+                    if (entry.kilograms > maxEntry.kilograms) {
+                        maxEntry = entry;
+                    }
+                }
+
+                document.getElementById('weightSummary').innerHTML = `
+                    <strong>Start Weight:</strong> ${startWeight} kg<br>
+                    <strong>End Weight:</strong> ${endWeight} kg<br>
+                    <strong>${direction}:</strong> ${Math.abs(dropKg)} kg (${Math.abs(percentChange)}%)<br><br>
+
+                    <strong>Lowest Weight:</strong> ${minEntry.kilograms} kg on ${minEntry.date}<br>
+                    <strong>Highest Weight:</strong> ${maxEntry.kilograms} kg on ${maxEntry.date}
+                `;
+            } else {
+                    document.getElementById('weightSummary').innerHTML = '';
+                }
+
+                const labels = data.map(entry => entry.date);
+                const weightsKilograms = data.map(entry => entry.kilograms);
+                const weightsStones = data.map(entry => entry.stones);
+                const age = data.map(entry => entry.age);
+                const bmi = data.map(entry => entry.bmi);
+                const bmiStatus = data.map(entry => entry.bmiStatus);
+                const goalWeight = data.map(entry => entry.goal);
+
+                const ctx = document.getElementById('weightChart').getContext('2d');
+
+                if (chartInstance) {
+                    chartInstance.destroy();
+                }
+
+                chartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
                                 label: 'Weight (kg)',
                                 data: weightsKilograms,
                                 borderColor: 'blue',
@@ -177,86 +242,92 @@
                                 fill: false,
                                 pointRadius: 0,
                                 pointBackgroundColor: 'green',
-                                borderDash: [5, 5], // Makes it a dashed line
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            plugins: {
-                                tooltip: {
-                                    callbacks: {
-                                        label: function (tooltipItem) {
-                                            const index = tooltipItem.dataIndex;
-                                            const kg = weightsKilograms[index];
-                                            const stoneLabel = weightsStones[index];
-                                            const ageLabel = age[index];
-                                            const bmiLabel = bmi[index];
-                                            const bmiStatusLabel = bmiStatus[index];
-                                            return `${kg}kg | ${stoneLabel} | ${ageLabel} years old | BMI ${bmiLabel} (${bmiStatusLabel})`;
-                                        }
+                                borderDash: [5, 5] // Makes it a dashed line
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            tooltip: {
+                                callbacks: {
+                                    label: function (tooltipItem) {
+                                        const index = tooltipItem.dataIndex;
+                                        const kg = weightsKilograms[index];
+                                        const stoneLabel = weightsStones[index];
+                                        const ageLabel = age[index];
+                                        const bmiLabel = bmi[index];
+                                        const bmiStatusLabel = bmiStatus[index];
+                                        return `${kg}kg | ${stoneLabel} | ${ageLabel} years old | BMI ${bmiLabel} (${bmiStatusLabel})`;
                                     }
                                 }
-                            },
-                            scales: {
-                                x: { title: { display: true, text: 'Date' } },
-                                y: { title: { display: true, text: 'Weight (kg)' }, beginAtZero: false }
                             }
+                        },
+                        scales: {
+                            x: { title: { display: true, text: 'Date' } },
+                            y: { title: { display: true, text: 'Weight (kg)' }, beginAtZero: false }
                         }
-                    });
-                });
-        }
-
-        // Convert DD/MM/YYYY to Date object for sorting
-        function convertToDate(dateString) {
-            const [day, month, year] = dateString.split('/');
-            return new Date(year, month - 1, day); // JavaScript months are 0-indexed
-        }
-
-        // Convert YYYY-MM-DD to DD/MM/YYYY
-        function convertDateFormat(dateString) {
-            const date = new Date(dateString);
-            const day = ("0" + date.getDate()).slice(-2);
-            const month = ("0" + (date.getMonth() + 1)).slice(-2);
-            const year = date.getFullYear();
-            return `${day}/${month}/${year}`;
-        }
-
-        document.getElementById('weightForm').addEventListener('submit', function (event) {
-            event.preventDefault();
-
-            const date = document.getElementById('date').value;
-            const weight = parseFloat(document.getElementById('weight').value);
-
-            const formattedDate = convertDateFormat(date);
-            const newWeight = { date: formattedDate, kilograms: weight };
-
-            fetch('/weights/add', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newWeight)
-            })
-                .then(response => {
-                    const alertMessage = document.getElementById('alertMessage');
-                    if (response.status === 201) {
-                        alertMessage.textContent = 'New weight added successfully! (refresh the page to see the updated chart)';
-                        alertMessage.className = 'alert success';
-                        alertMessage.style.display = 'block';
-                    } else {
-                        alertMessage.textContent = 'Failed to add weight. Please try again.';
-                        alertMessage.className = 'alert error';
-                        alertMessage.style.display = 'block';
                     }
-                })
-                .catch(error => {
-                    const alertMessage = document.getElementById('alertMessage');
-                    alertMessage.textContent = 'Error: ' + error;
+                });
+            });
+    }
+
+    // Convert DD/MM/YYYY to Date object for sorting
+    function convertToDate(dateString) {
+        const [day, month, year] = dateString.split('/');
+        return new Date(year, month - 1, day); // JavaScript months are 0-indexed
+    }
+
+    // Convert YYYY-MM-DD to DD/MM/YYYY
+    function convertDateFormat(dateString) {
+        const date = new Date(dateString);
+        const day = ("0" + date.getDate()).slice(-2);
+        const month = ("0" + (date.getMonth() + 1)).slice(-2);
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
+    }
+
+    document.getElementById('applyRange').addEventListener('click', function () {
+        const rangeValue = document.getElementById('rangeInput').value;
+        fetchWeights(rangeValue);
+    });
+
+    document.getElementById('weightForm').addEventListener('submit', function (event) {
+        event.preventDefault();
+
+        const date = document.getElementById('date').value;
+        const weight = parseFloat(document.getElementById('weight').value);
+
+        const formattedDate = convertDateFormat(date);
+        const newWeight = { date: formattedDate, kilograms: weight };
+
+        fetch('/weights/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newWeight)
+        })
+            .then(response => {
+                const alertMessage = document.getElementById('alertMessage');
+                if (response.status === 201) {
+                    alertMessage.textContent = 'New weight added successfully! (refresh the page to see the updated chart)';
+                    alertMessage.className = 'alert success';
+                    alertMessage.style.display = 'block';
+                } else {
+                    alertMessage.textContent = 'Failed to add weight. Please try again.';
                     alertMessage.className = 'alert error';
                     alertMessage.style.display = 'block';
-                });
-        });
+                }
+            })
+            .catch(error => {
+                const alertMessage = document.getElementById('alertMessage');
+                alertMessage.textContent = 'Error: ' + error;
+                alertMessage.className = 'alert error';
+                alertMessage.style.display = 'block';
+            });
+    });
 
-        fetchWeights();
-    </script>
+    fetchWeights();
+</script>
 
 </body>
 
