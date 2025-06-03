@@ -2,10 +2,11 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KiloKeeper</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -33,8 +34,7 @@
 
         img.logo {
             display: block;
-            margin-left: auto;
-            margin-right: auto;
+            margin: auto;
             margin-bottom: 30px;
             width: 50%;
         }
@@ -69,7 +69,6 @@
             border: 1px solid #ddd;
             border-radius: 4px;
             font-size: 16px;
-            box-sizing: border-box;
         }
 
         .form-container button {
@@ -126,6 +125,15 @@
             <label for="rangeInput">View the last</label>
             <input type="number" id="rangeInput" min="1" placeholder="e.g. 30" style="width: 80px; padding: 5px;">
             <span>days</span>
+
+            <label for="granularitySelect" style="margin-left: 20px;">Colour by</label>
+            <select id="granularitySelect" style="padding: 5px;">
+                <option value="year">Year</option>
+                <option value="month">Month</option>
+                <option value="week">Week</option>
+                <option value="day">Day</option>
+            </select>
+
             <button id="applyRange" style="margin-left: 10px; padding: 6px 12px;">Apply</button>
         </div>
 
@@ -142,27 +150,22 @@
             <form id="weightForm">
                 <label for="date">Date:</label>
                 <input type="date" id="date" required>
-                <br>
                 <label for="weight">Weight (kg):</label>
                 <input type="number" id="weight" step="0.1" required>
-                <br>
                 <button type="submit">Add Weight</button>
             </form>
         </div>
-
     </div>
 
     <script>
         let chartInstance = null;
 
-        function fetchWeights(filterDays = null) {
+        function fetchWeights(filterDays = null, granularity = 'year') {
             fetch('/weights')
                 .then(response => response.json())
                 .then(data => {
                     data.sort((a, b) => {
-                        const dateA = new Date(convertToDate(a.date));
-                        const dateB = new Date(convertToDate(b.date));
-                        return dateA - dateB;
+                        return new Date(convertToDate(a.date)) - new Date(convertToDate(b.date));
                     });
 
                     if (filterDays && !isNaN(filterDays)) {
@@ -171,37 +174,28 @@
                         data = data.filter(entry => new Date(convertToDate(entry.date)) >= cutoff);
                     }
 
-                    // Summary section: Calculate drop and percentage
+                    // Summary
                     if (data.length >= 2) {
                         const startWeight = data[0].kilograms;
                         const endWeight = data[data.length - 1].kilograms;
-
                         const dropKg = (startWeight - endWeight).toFixed(1);
                         const percentChange = ((dropKg / startWeight) * 100).toFixed(1);
-
                         const direction = dropKg >= 0 ? 'Loss' : 'Gain';
 
-                        // Find min and max entries
                         let minEntry = data[0];
                         let maxEntry = data[0];
-
                         for (let entry of data) {
-                            if (entry.kilograms < minEntry.kilograms) {
-                                minEntry = entry;
-                            }
-                            if (entry.kilograms > maxEntry.kilograms) {
-                                maxEntry = entry;
-                            }
+                            if (entry.kilograms < minEntry.kilograms) minEntry = entry;
+                            if (entry.kilograms > maxEntry.kilograms) maxEntry = entry;
                         }
 
                         document.getElementById('weightSummary').innerHTML = `
-                    <strong>Start Weight:</strong> ${startWeight} kg<br>
-                    <strong>End Weight:</strong> ${endWeight} kg<br>
-                    <strong>${direction}:</strong> ${Math.abs(dropKg)} kg (${Math.abs(percentChange)}%)<br><br>
-
-                    <strong>Lowest Weight:</strong> ${minEntry.kilograms} kg on ${minEntry.date}<br>
-                    <strong>Highest Weight:</strong> ${maxEntry.kilograms} kg on ${maxEntry.date}
-                `;
+                        <strong>Start Weight:</strong> ${startWeight} kg<br>
+                        <strong>End Weight:</strong> ${endWeight} kg<br>
+                        <strong>${direction}:</strong> ${Math.abs(dropKg)} kg (${Math.abs(percentChange)}%)<br><br>
+                        <strong>Lowest Weight:</strong> ${minEntry.kilograms} kg on ${minEntry.date}<br>
+                        <strong>Highest Weight:</strong> ${maxEntry.kilograms} kg on ${maxEntry.date}
+                    `;
                     } else {
                         document.getElementById('weightSummary').innerHTML = '';
                     }
@@ -214,16 +208,72 @@
                     const bmiStatus = data.map(entry => entry.bmiStatus);
                     const goalWeight = data.map(entry => entry.goal);
 
-                    const ctx = document.getElementById('weightChart').getContext('2d');
+                    const palette = [
+                        'rgba(255, 99, 132, 0.1)',
+                        'rgba(255, 206, 86, 0.1)',
+                        'rgba(75, 192, 192, 0.1)',
+                        'rgba(153, 102, 255, 0.1)',
+                        'rgba(255, 159, 64, 0.1)',
+                        'rgba(54, 162, 235, 0.1)'
+                    ];
 
-                    if (chartInstance) {
-                        chartInstance.destroy();
+                    const groupMap = new Map();
+                    data.forEach((entry, index) => {
+                        const [day, month, year] = entry.date.split('/');
+                        let key;
+                        switch (granularity) {
+                            case 'day':
+                                key = `${day}/${month}/${year}`;
+                                break;
+                            case 'week': {
+                                const dateObj = new Date(year, month - 1, day);
+                                const firstDay = new Date(dateObj.getFullYear(), 0, 1);
+                                const days = Math.floor((dateObj - firstDay) / (24 * 60 * 60 * 1000));
+                                const week = Math.ceil((days + firstDay.getDay() + 1) / 7);
+                                key = `Week ${week}, ${year}`;
+                                break;
+                            }
+                            case 'month':
+                                key = `${month}/${year}`;
+                                break;
+                            default:
+                                key = year;
+                        }
+                        if (!groupMap.has(key)) groupMap.set(key, []);
+                        groupMap.get(key).push(index);
+                    });
+
+                    const annotations = {};
+                    let colorIndex = 0;
+                    for (const [key, indexes] of groupMap.entries()) {
+                        const xMin = indexes[0] - 0.5;
+                        const xMax = indexes[indexes.length - 1] + 0.5;
+                        annotations[`group_${key}`] = {
+                            type: 'box',
+                            xMin,
+                            xMax,
+                            xScaleID: 'x',
+                            backgroundColor: palette[colorIndex % palette.length],
+                            borderWidth: 0,
+                            label: {
+                                content: key,
+                                enabled: true,
+                                position: 'start',
+                                color: '#444',
+                                backgroundColor: 'transparent',
+                                font: { weight: 'bold' }
+                            }
+                        };
+                        colorIndex++;
                     }
+
+                    const ctx = document.getElementById('weightChart').getContext('2d');
+                    if (chartInstance) chartInstance.destroy();
 
                     chartInstance = new Chart(ctx, {
                         type: 'line',
                         data: {
-                            labels: labels,
+                            labels,
                             datasets: [
                                 {
                                     label: 'Weight (kg)',
@@ -242,7 +292,7 @@
                                     fill: false,
                                     pointRadius: 0,
                                     pointBackgroundColor: 'green',
-                                    borderDash: [5, 5] // Makes it a dashed line
+                                    borderDash: [5, 5]
                                 }
                             ]
                         },
@@ -253,18 +303,16 @@
                                     callbacks: {
                                         label: function (tooltipItem) {
                                             const index = tooltipItem.dataIndex;
-                                            const kg = weightsKilograms[index];
-                                            const stoneLabel = weightsStones[index];
-                                            const ageLabel = age[index];
-                                            const bmiLabel = bmi[index];
-                                            const bmiStatusLabel = bmiStatus[index];
-                                            return `${kg}kg | ${stoneLabel} | ${ageLabel} years old | BMI ${bmiLabel} (${bmiStatusLabel})`;
+                                            return `${weightsKilograms[index]}kg | ${weightsStones[index]} | ${age[index]} years old | BMI ${bmi[index]} (${bmiStatus[index]})`;
                                         }
                                     }
+                                },
+                                annotation: {
+                                    annotations: annotations
                                 }
                             },
                             scales: {
-                                x: { title: { display: true, text: 'Date' } },
+                                x: { title: { display: true, text: 'Date' }, type: 'category' },
                                 y: { title: { display: true, text: 'Weight (kg)' }, beginAtZero: false }
                             }
                         }
@@ -272,13 +320,11 @@
                 });
         }
 
-        // Convert DD/MM/YYYY to Date object for sorting
         function convertToDate(dateString) {
             const [day, month, year] = dateString.split('/');
-            return new Date(year, month - 1, day); // JavaScript months are 0-indexed
+            return new Date(year, month - 1, day);
         }
 
-        // Convert YYYY-MM-DD to DD/MM/YYYY
         function convertDateFormat(dateString) {
             const date = new Date(dateString);
             const day = ("0" + date.getDate()).slice(-2);
@@ -289,15 +335,14 @@
 
         document.getElementById('applyRange').addEventListener('click', function () {
             const rangeValue = document.getElementById('rangeInput').value;
-            fetchWeights(rangeValue);
+            const granularity = document.getElementById('granularitySelect').value;
+            fetchWeights(rangeValue, granularity);
         });
 
         document.getElementById('weightForm').addEventListener('submit', function (event) {
             event.preventDefault();
-
             const date = document.getElementById('date').value;
             const weight = parseFloat(document.getElementById('weight').value);
-
             const formattedDate = convertDateFormat(date);
             const newWeight = { date: formattedDate, kilograms: weight };
 
@@ -328,7 +373,6 @@
 
         fetchWeights();
     </script>
-
 </body>
 
 </html>
